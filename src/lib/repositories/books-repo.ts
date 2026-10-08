@@ -109,7 +109,7 @@ export async function getAllBooks(): Promise<Book[]> {
 export async function getPublishedBooks(): Promise<Book[]> {
   if (isPostgresConfigured()) {
     try {
-      const rows = await query("SELECT * FROM books WHERE (status = 'published' OR (status IS NULL AND published = true)) ORDER BY published_date DESC");
+      const rows = await query("SELECT * FROM books WHERE (status = 'published' OR (status IS NULL AND published = true)) ORDER BY created_at DESC");
       return rows.map(mapRowToBook);
     } catch (err) {
       console.error("[Books Repo] Postgres query failed, falling back to local store:", err);
@@ -119,7 +119,7 @@ export async function getPublishedBooks(): Promise<Book[]> {
   ensureLocalFile();
   return memoryBooks
     .filter((b) => b.status === "published" || (b.status === undefined && b.published))
-    .sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function getFeaturedBooks(): Promise<Book[]> {
