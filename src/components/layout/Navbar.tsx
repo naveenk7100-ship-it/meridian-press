@@ -16,8 +16,6 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
-  const isAdminRoute = pathname.startsWith("/admin");
-
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[#E7E2D8] bg-[#FAF8F5]/90 backdrop-blur-md transition-all">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-18">
@@ -60,19 +58,14 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Right Action: Admin / Direct Catalog CTA */}
+        {/* Right Action: Patron Order Access / Direct Catalog CTA */}
         <div className="hidden md:flex items-center gap-4">
           <Link
-            href="/admin"
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium rounded-sm border transition-colors",
-              isAdminRoute
-                ? "border-[#B85D19] bg-[#B85D19]/10 text-[#B85D19]"
-                : "border-[#E7E2D8] text-[#737680] hover:text-[#14161A] hover:border-[#14161A]"
-            )}
+            href="/orders/recover"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-medium rounded-sm border border-[#E7E2D8] text-[#5C5F68] hover:text-[#14161A] hover:border-[#14161A] transition-colors"
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Admin Desk</span>
+            <ShieldCheck className="h-3.5 w-3.5 text-[#B85D19]" />
+            <span>Find Purchased Books</span>
           </Link>
 
           <Link
@@ -87,11 +80,11 @@ export function Navbar() {
         {/* Mobile menu trigger */}
         <div className="flex md:hidden items-center gap-2">
           <Link
-            href="/admin"
+            href="/orders/recover"
             className="p-2 text-[#737680] hover:text-[#14161A]"
-            title="Admin Desk"
+            title="Find Purchased Books"
           >
-            <ShieldCheck className="h-5 w-5" />
+            <ShieldCheck className="h-5 w-5 text-[#B85D19]" />
           </Link>
           <button
             type="button"
@@ -135,12 +128,12 @@ export function Navbar() {
               <span>Browse All Books</span>
             </Link>
             <Link
-              href="/admin"
+              href="/orders/recover"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 w-full rounded-sm border border-[#E7E2D8] px-4 py-2 text-xs font-mono text-[#737680] hover:text-[#14161A]"
+              className="flex items-center justify-center gap-2 w-full rounded-sm border border-[#E7E2D8] px-4 py-2 text-xs font-mono text-[#5C5F68] hover:text-[#14161A]"
             >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>Publisher Admin Desk</span>
+              <ShieldCheck className="h-3.5 w-3.5 text-[#B85D19]" />
+              <span>Find My Purchased Books</span>
             </Link>
           </div>
         </div>

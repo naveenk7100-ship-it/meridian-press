@@ -1,5 +1,88 @@
 [
   {
+    "id": "book-1791474169624-967xi",
+    "slug": "the-ai-tricks-nobody-taught-you",
+    "title": "THE AI TRICKS NOBODY TAUGHT YOU",
+    "subtitle": "50 practical AI tricks, experiments & workflows that will change how you use AI",
+    "description": "50 practical AI tricks, experiments & workflows that will change how you use AI.",
+    "synopsis": "50 practical AI tricks, experiments, and workflows designed to help you discover more useful, creative, and efficient ways to work with AI.",
+    "author": {
+      "name": "ALEXANDER REED",
+      "bio": "AI researcher, practitioner, and author exploring practical workflows, system design, and prompt engineering paradigms.",
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80"
+    },
+    "category": "Independent Thought",
+    "tags": [
+      "AI",
+      "Artificial Intelligence",
+      "AI Tools",
+      "AI Tricks",
+      "AI Workflows",
+      "Productivity",
+      "Prompt Engineering",
+      "Experiments"
+    ],
+    "price": 799,
+    "currency": "INR",
+    "coverImage": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=85",
+    "coverColorTheme": {
+      "background": "#1c2321",
+      "accent": "#d4a373",
+      "textColor": "#fefae0"
+    },
+    "pageCount": 240,
+    "wordCount": 60000,
+    "readingTimeMinutes": 280,
+    "isbn": "978-1-962045-07-0",
+    "edition": "First Edition",
+    "publishedYear": 2026,
+    "publishedDate": "2026-10-08",
+    "formats": [
+      {
+        "type": "EPUB",
+        "size": "4.5 MB",
+        "drmFree": true,
+        "version": "3.2"
+      },
+      {
+        "type": "PDF",
+        "size": "12.0 MB",
+        "drmFree": true,
+        "version": "Print Master"
+      },
+      {
+        "type": "MOBI",
+        "size": "5.5 MB",
+        "drmFree": true,
+        "version": "KF8"
+      }
+    ],
+    "sampleChapter": {
+      "title": "Chapter 1: The Core Invariant",
+      "subtitle": "Why fundamentals outlive temporary abstractions",
+      "content": "### 1.1 The Invariant Principle\n\nEvery enduring system starts with an uncompromising thesis about what does not change. In AI engineering, while model weights and API interfaces change rapidly, the core fundamentals of clear intent, deterministic validation, and structured feedback loops remain invariant."
+    },
+    "tableOfContents": [
+      "Introduction: Moving Beyond Toy Demos",
+      "Chapter 1: The Core Invariant",
+      "Chapter 2: Protocols & Boundaries",
+      "Chapter 3: Verification & Truth",
+      "Epilogue: The Sovereign AI Practitioner"
+    ],
+    "digitalFileReference": {
+      "fileName": "the-ai-tricks-nobody-taught-you-edition.zip",
+      "fileSize": "22 MB"
+    },
+    "isFeatured": true,
+    "isBestseller": false,
+    "status": "published",
+    "published": true,
+    "seoTitle": "THE AI TRICKS NOBODY TAUGHT YOU | Meridian Press",
+    "seoDescription": "Discover 50 practical AI tricks, experiments and workflows designed to help you use AI more creatively, efficiently and effectively.",
+    "createdAt": "2026-10-08T15:42:49.624Z",
+    "updatedAt": "2026-10-08T15:42:49.624Z"
+  },
+  {
     "id": "book-001",
     "slug": "the-architecture-of-durable-systems",
     "title": "The Architecture of Durable Systems",

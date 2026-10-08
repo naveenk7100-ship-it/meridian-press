@@ -114,11 +114,6 @@ export function Footer() {
                   Order Recovery Desk
                 </Link>
               </li>
-              <li>
-                <Link href="/admin" className="hover:text-[#FAF8F5] transition-colors font-mono text-xs text-[#B85D19]">
-                  Admin Portal →
-                </Link>
-              </li>
             </ul>
           </div>
 
