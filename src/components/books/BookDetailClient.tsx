@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Book } from "@/types/book";
 import { BookCover } from "@/components/books/BookCover";
 import { FormatBadge } from "@/components/books/FormatBadge";
 import { SampleReaderModal } from "@/components/books/SampleReaderModal";
 import { CheckoutModal } from "@/components/books/CheckoutModal";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 import {
   BookOpen,
   Download,
   CheckCircle2,
   Share2,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,8 +28,52 @@ export function BookDetailClient({ book, relatedBooks }: BookDetailClientProps) 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Dispatch privacy-safe telemetry on book page view
+  useEffect(() => {
+    trackEvent("monograph_view", {
+      bookId: book.id,
+      slug: book.slug,
+      title: book.title,
+      category: book.category,
+      price: book.price,
+      currency: book.currency,
+    });
+  }, [book]);
+
+  const handleOpenReader = () => {
+    trackEvent("sample_reader_opened", {
+      bookId: book.id,
+      slug: book.slug,
+      title: book.title,
+    });
+    setReaderOpen(true);
+  };
+
+  const handleOpenCheckout = () => {
+    trackEvent("checkout_initiated", {
+      bookId: book.id,
+      slug: book.slug,
+      title: book.title,
+      price: book.price,
+      currency: book.currency,
+      channel: "razorpay",
+    });
+    setCheckoutOpen(true);
+  };
+
+  const handleGumroadClick = () => {
+    trackEvent("checkout_initiated", {
+      bookId: book.id,
+      slug: book.slug,
+      title: book.title,
+      price: book.price,
+      currency: book.currency,
+      channel: "gumroad",
+    });
+  };
+
   const handleShare = () => {
-    if (navigator.clipboard) {
+    if (typeof window !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
@@ -64,7 +111,7 @@ export function BookDetailClient({ book, relatedBooks }: BookDetailClientProps) 
           <div className="lg:col-span-5 flex flex-col items-center">
             <div
               className="relative cursor-pointer group"
-              onClick={() => setReaderOpen(true)}
+              onClick={handleOpenReader}
               title="Click to open sample reader"
             >
               <BookCover book={book} size="xl" />
@@ -140,11 +187,12 @@ export function BookDetailClient({ book, relatedBooks }: BookDetailClientProps) 
                 <FormatBadge formats={book.formats} />
               </div>
 
+              {/* Action Buttons: Razorpay, Sample Reader, and optional Gumroad button */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setCheckoutOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium rounded-sm bg-[#14161A] text-[#FAF8F5] hover:bg-[#2B2D33] transition-all active:scale-[0.99] shadow-sm"
+                  onClick={handleOpenCheckout}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium rounded-sm bg-[#14161A] text-[#FAF8F5] hover:bg-[#2B2D33] transition-all active:scale-[0.99] shadow-sm cursor-pointer"
                 >
                   <Download className="h-4 w-4 text-[#B85D19]" />
                   <span>Acquire Monograph</span>
@@ -152,13 +200,30 @@ export function BookDetailClient({ book, relatedBooks }: BookDetailClientProps) 
 
                 <button
                   type="button"
-                  onClick={() => setReaderOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium rounded-sm border border-[#DDD6C9] bg-[#FAF8F5] text-[#14161A] hover:bg-[#FAF8F5]/80 transition-colors active:scale-[0.99]"
+                  onClick={handleOpenReader}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium rounded-sm border border-[#DDD6C9] bg-[#FAF8F5] text-[#14161A] hover:bg-[#FAF8F5]/80 transition-colors active:scale-[0.99] cursor-pointer"
                 >
                   <BookOpen className="h-4 w-4 text-[#B85D19]" />
                   <span>Read Sample Chapter</span>
                 </button>
               </div>
+
+              {/* Optional Secondary Gumroad Checkout Link */}
+              {book.gumroadUrl && (
+                <div className="pt-1">
+                  <a
+                    href={book.gumroadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleGumroadClick}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-sm border border-[#DDD6C9] bg-white text-xs font-mono text-[#5C5F68] hover:text-[#14161A] hover:border-[#14161A] transition-all"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-[#B85D19]" />
+                    <span>Or Purchase on Gumroad (Alternative Checkout)</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
 
               {/* Delivery Guarantees */}
               <div className="pt-2 grid grid-cols-2 gap-2 text-xs font-mono text-[#5C5F68]">
@@ -227,8 +292,8 @@ export function BookDetailClient({ book, relatedBooks }: BookDetailClientProps) 
                     {idx === 1 && (
                       <button
                         type="button"
-                        onClick={() => setReaderOpen(true)}
-                        className="font-mono text-[10px] text-[#B85D19] uppercase tracking-wider bg-[#F7EFE9] px-2 py-0.5 rounded-[2px] hover:bg-[#EACBB7]"
+                        onClick={handleOpenReader}
+                        className="font-mono text-[10px] text-[#B85D19] uppercase tracking-wider bg-[#F7EFE9] px-2 py-0.5 rounded-[2px] hover:bg-[#EACBB7] cursor-pointer"
                       >
                         Sample Preview
                       </button>

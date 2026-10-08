@@ -1,7 +1,8 @@
 "use client";
-
+ 
 import { useState } from "react";
 import { CheckCircle2, Loader2, Feather } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export function NewsletterSection() {
   const [email, setEmail] = useState("");
@@ -26,6 +27,7 @@ export function NewsletterSection() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        trackEvent("newsletter_subscribed", { frequency });
         setStatus("success");
         setMessage(data.message || "Thank you. You are subscribed to the Meridian Dispatch.");
         setEmail("");

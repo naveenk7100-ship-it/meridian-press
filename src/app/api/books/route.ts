@@ -98,7 +98,11 @@ export async function POST(request: NextRequest) {
       },
       isFeatured: Boolean(body.isFeatured),
       isBestseller: Boolean(body.isBestseller),
-      published: body.published !== undefined ? Boolean(body.published) : true,
+      status: body.status || (body.published !== false ? "published" : "draft"),
+      published: body.status ? body.status === "published" : (body.published !== undefined ? Boolean(body.published) : true),
+      gumroadUrl: body.gumroadUrl || undefined,
+      seoTitle: body.seoTitle || undefined,
+      seoDescription: body.seoDescription || undefined,
     });
 
     return NextResponse.json({ success: true, book: newBook }, { status: 201 });

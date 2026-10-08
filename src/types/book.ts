@@ -21,6 +21,8 @@ export interface Chapter {
   content: string;
 }
 
+export type BookStatus = "draft" | "published" | "archived";
+
 export interface Book {
   id: string;
   slug: string;
@@ -62,6 +64,10 @@ export interface Book {
     fileSize: string;
     checksum?: string;
   };
+  status?: BookStatus;
+  gumroadUrl?: string;
+  seoTitle?: string;
+  seoDescription?: string;
   isFeatured: boolean;
   isBestseller?: boolean;
   published: boolean;
@@ -71,3 +77,4 @@ export interface Book {
 
 export type BookCreateInput = Omit<Book, "id" | "createdAt" | "updatedAt">;
 export type BookUpdateInput = Partial<BookCreateInput>;
+

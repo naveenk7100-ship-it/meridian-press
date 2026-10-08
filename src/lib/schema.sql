@@ -32,12 +32,17 @@ CREATE TABLE IF NOT EXISTS books (
   is_featured BOOLEAN DEFAULT false,
   is_bestseller BOOLEAN DEFAULT false,
   published BOOLEAN DEFAULT true,
+  status VARCHAR(32) DEFAULT 'published',
+  gumroad_url TEXT,
+  seo_title VARCHAR(255),
+  seo_description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_books_slug ON books(slug);
 CREATE INDEX IF NOT EXISTS idx_books_published ON books(published);
+CREATE INDEX IF NOT EXISTS idx_books_status ON books(status);
 CREATE INDEX IF NOT EXISTS idx_books_category ON books(category);
 
 -- 2. Customers Table

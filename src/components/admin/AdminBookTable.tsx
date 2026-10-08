@@ -13,6 +13,9 @@ import {
   EyeOff,
   Star,
   Loader2,
+  Globe,
+  FileCheck,
+  Archive,
 } from "lucide-react";
 
 interface AdminBookTableProps {
@@ -65,16 +68,27 @@ export function AdminBookTable({
     }
   };
 
+  if (books.length === 0) {
+    return (
+      <div className="rounded-md border border-[#E7E2D8] bg-[#FAF8F5] p-12 text-center space-y-3">
+        <p className="font-serif text-base text-[#14161A]">No monographs match your current filter.</p>
+        <p className="font-mono text-xs text-[#737680]">
+          Adjust search criteria or click &quot;Publish Monograph&quot; to add a new title.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-[#E7E2D8] bg-[#FAF8F5] overflow-hidden shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs font-sans">
           <thead className="border-b border-[#E7E2D8] bg-[#F4EFE6] font-mono uppercase tracking-wider text-[#737680]">
             <tr>
-              <th className="py-3 px-4">Monograph</th>
+              <th className="py-3 px-4">Monograph & Slug</th>
               <th className="py-3 px-4">Category</th>
               <th className="py-3 px-4">Author</th>
-              <th className="py-3 px-4">Price</th>
+              <th className="py-3 px-4">Price & Channels</th>
               <th className="py-3 px-4 text-center">Status</th>
               <th className="py-3 px-4 text-right">Actions</th>
             </tr>
@@ -84,6 +98,8 @@ export function AdminBookTable({
               const isToggling = togglingId === book.id;
               const isDeleting = deletingId === book.id;
               const isConfirming = confirmDeleteId === book.id;
+              const isLive = book.status === "published" || (book.status === undefined && book.published);
+              const isArchived = book.status === "archived";
 
               return (
                 <tr
@@ -103,12 +119,18 @@ export function AdminBookTable({
                         <div className="font-mono text-[10px] text-[#737680] truncate">
                           /{book.slug}
                         </div>
-                        {book.isFeatured && (
-                          <span className="inline-flex items-center gap-1 font-mono text-[9px] text-[#B85D19] mt-0.5">
-                            <Star className="h-2.5 w-2.5 fill-current" />
-                            Featured
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {book.isFeatured && (
+                            <span className="inline-flex items-center gap-0.5 font-mono text-[9px] text-[#B85D19]">
+                              <Star className="h-2.5 w-2.5 fill-current" />
+                              Featured
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-1 font-mono text-[9px] text-[#737680]">
+                            <FileCheck className="h-2.5 w-2.5" />
+                            {book.formats?.length || 3} formats
                           </span>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -123,29 +145,44 @@ export function AdminBookTable({
                     {book.author.name}
                   </td>
 
-                  {/* Price */}
-                  <td className="py-3.5 px-4 font-mono font-medium text-[#14161A]">
-                    {formatPrice(book.price, book.currency)}
+                  {/* Price & Checkout channels */}
+                  <td className="py-3.5 px-4">
+                    <div className="font-mono font-medium text-[#14161A]">
+                      {formatPrice(book.price, book.currency)}
+                    </div>
+                    {book.gumroadUrl && (
+                      <span className="inline-flex items-center gap-1 text-[9px] font-mono text-[#737680] mt-0.5">
+                        <Globe className="h-2.5 w-2.5 text-[#B85D19]" />
+                        Gumroad Linked
+                      </span>
+                    )}
                   </td>
 
-                  {/* Status Toggle */}
+                  {/* Status Toggle Button */}
                   <td className="py-3.5 px-4 text-center">
                     <button
                       type="button"
                       disabled={isToggling}
                       onClick={() => handleToggle(book)}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all ${
-                        book.published
+                        isLive
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                          : isArchived
+                          ? "bg-stone-100 text-stone-700 border border-stone-300 hover:bg-stone-200"
                           : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
                       }`}
                     >
                       {isToggling ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : book.published ? (
+                      ) : isLive ? (
                         <>
                           <Eye className="h-3 w-3 text-emerald-600" />
                           <span>Live</span>
+                        </>
+                      ) : isArchived ? (
+                        <>
+                          <Archive className="h-3 w-3 text-stone-600" />
+                          <span>Archived</span>
                         </>
                       ) : (
                         <>
@@ -163,7 +200,7 @@ export function AdminBookTable({
                         href={`/books/${book.slug}`}
                         target="_blank"
                         className="p-1.5 rounded-sm text-[#737680] hover:text-[#14161A] hover:bg-[#EAE3D6]"
-                        title="View live monograph page"
+                        title="View live storefront page"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Link>

@@ -46,6 +46,8 @@ data/customers.json
 data/entitlements.json
 data/orders.json
 data/payments.json
+data/subscribers.json
+
 
 # vercel
 .vercel

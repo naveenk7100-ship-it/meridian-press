@@ -47,11 +47,12 @@ async function runMigration() {
             page_count, word_count, reading_time_minutes, isbn,
             edition, published_year, published_date, formats,
             sample_chapter, table_of_contents, digital_file_reference,
+            status, gumroad_url, seo_title, seo_description,
             is_featured, is_bestseller, published, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
             $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
-            $25, $26, $27, $28, $29, $30, $31
+            $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
           ) ON CONFLICT (id) DO NOTHING`,
           [
             b.id,
@@ -80,6 +81,10 @@ async function runMigration() {
             JSON.stringify(b.sampleChapter),
             JSON.stringify(b.tableOfContents),
             JSON.stringify(b.digitalFileReference),
+            b.status || "published",
+            b.gumroadUrl || null,
+            b.seoTitle || null,
+            b.seoDescription || null,
             b.isFeatured,
             b.isBestseller || false,
             b.published,

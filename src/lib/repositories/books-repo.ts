@@ -46,6 +46,9 @@ function persistLocal(): void {
 }
 
 function mapRowToBook(row: Record<string, unknown>): Book {
+  const published = Boolean(row.published);
+  const status = (row.status as Book["status"]) || (published ? "published" : "draft");
+
   return {
     id: String(row.id),
     slug: String(row.slug),
@@ -75,9 +78,13 @@ function mapRowToBook(row: Record<string, unknown>): Book {
     sampleChapter: typeof row.sample_chapter === "string" ? JSON.parse(row.sample_chapter) : (row.sample_chapter as Book["sampleChapter"]) || { title: "", content: "" },
     tableOfContents: typeof row.table_of_contents === "string" ? JSON.parse(row.table_of_contents) : (row.table_of_contents as string[]) || [],
     digitalFileReference: typeof row.digital_file_reference === "string" ? JSON.parse(row.digital_file_reference) : (row.digital_file_reference as Book["digitalFileReference"]) || { fileName: "", fileSize: "" },
+    status,
+    gumroadUrl: row.gumroad_url ? String(row.gumroad_url) : undefined,
+    seoTitle: row.seo_title ? String(row.seo_title) : undefined,
+    seoDescription: row.seo_description ? String(row.seo_description) : undefined,
     isFeatured: Boolean(row.is_featured),
     isBestseller: Boolean(row.is_bestseller),
-    published: Boolean(row.published),
+    published: status === "published",
     createdAt: new Date(String(row.created_at)).toISOString(),
     updatedAt: new Date(String(row.updated_at)).toISOString(),
   };
@@ -104,7 +111,7 @@ export async function getAllBooks(): Promise<Book[]> {
 export async function getPublishedBooks(): Promise<Book[]> {
   if (isPostgresConfigured()) {
     try {
-      const rows = await query("SELECT * FROM books WHERE published = true ORDER BY published_date DESC");
+      const rows = await query("SELECT * FROM books WHERE (status = 'published' OR (status IS NULL AND published = true)) ORDER BY published_date DESC");
       if (rows.length > 0) {
         return rows.map(mapRowToBook);
       }
@@ -115,7 +122,7 @@ export async function getPublishedBooks(): Promise<Book[]> {
 
   ensureLocalFile();
   return memoryBooks
-    .filter((b) => b.published)
+    .filter((b) => b.status === "published" || (b.status === undefined && b.published))
     .sort((a, b) => new Date(b.publishedDate).getTime() - new Date(a.publishedDate).getTime());
 }
 
@@ -176,11 +183,18 @@ export async function createBookRecord(input: BookCreateInput): Promise<Book> {
     counter++;
   }
 
+  const status = input.status || (input.published !== false ? "published" : "draft");
+  const published = status === "published";
   const now = new Date().toISOString();
   const newBook: Book = {
     ...input,
     id: `book-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     slug: finalSlug,
+    status,
+    published,
+    gumroadUrl: input.gumroadUrl || undefined,
+    seoTitle: input.seoTitle || undefined,
+    seoDescription: input.seoDescription || undefined,
     createdAt: now,
     updatedAt: now,
   };
@@ -195,11 +209,12 @@ export async function createBookRecord(input: BookCreateInput): Promise<Book> {
           page_count, word_count, reading_time_minutes, isbn,
           edition, published_year, published_date, formats,
           sample_chapter, table_of_contents, digital_file_reference,
+          status, gumroad_url, seo_title, seo_description,
           is_featured, is_bestseller, published, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
           $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
-          $25, $26, $27, $28, $29, $30, $31
+          $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35
         )`,
         [
           newBook.id,
@@ -228,6 +243,10 @@ export async function createBookRecord(input: BookCreateInput): Promise<Book> {
           JSON.stringify(newBook.sampleChapter),
           JSON.stringify(newBook.tableOfContents),
           JSON.stringify(newBook.digitalFileReference),
+          newBook.status,
+          newBook.gumroadUrl || null,
+          newBook.seoTitle || null,
+          newBook.seoDescription || null,
           newBook.isFeatured,
           newBook.isBestseller || false,
           newBook.published,
@@ -262,10 +281,20 @@ export async function updateBookRecord(id: string, input: BookUpdateInput): Prom
     slug = finalSlug;
   }
 
+  let status = input.status !== undefined ? input.status : existing.status;
+  let published = input.published !== undefined ? input.published : existing.published;
+  if (input.status !== undefined && input.published === undefined) {
+    published = input.status === "published";
+  } else if (input.published !== undefined && input.status === undefined) {
+    status = input.published ? "published" : "draft";
+  }
+
   const updated: Book = {
     ...existing,
     ...input,
     slug,
+    status,
+    published,
     updatedAt: new Date().toISOString(),
   };
 
@@ -280,8 +309,9 @@ export async function updateBookRecord(id: string, input: BookUpdateInput): Prom
           reading_time_minutes = $17, isbn = $18, edition = $19,
           published_year = $20, published_date = $21, formats = $22,
           sample_chapter = $23, table_of_contents = $24, digital_file_reference = $25,
-          is_featured = $26, is_bestseller = $27, published = $28, updated_at = $29
-        WHERE id = $30`,
+          status = $26, gumroad_url = $27, seo_title = $28, seo_description = $29,
+          is_featured = $30, is_bestseller = $31, published = $32, updated_at = $33
+        WHERE id = $34`,
         [
           updated.slug,
           updated.title,
@@ -308,6 +338,10 @@ export async function updateBookRecord(id: string, input: BookUpdateInput): Prom
           JSON.stringify(updated.sampleChapter),
           JSON.stringify(updated.tableOfContents),
           JSON.stringify(updated.digitalFileReference),
+          updated.status,
+          updated.gumroadUrl || null,
+          updated.seoTitle || null,
+          updated.seoDescription || null,
           updated.isFeatured,
           updated.isBestseller || false,
           updated.published,
@@ -351,5 +385,6 @@ export async function deleteBookRecord(id: string): Promise<boolean> {
 export async function toggleBookPublishRecord(id: string): Promise<Book | null> {
   const book = await getBookById(id);
   if (!book) return null;
-  return updateBookRecord(id, { published: !book.published });
+  const newStatus = book.status === "published" ? "draft" : "published";
+  return updateBookRecord(id, { status: newStatus, published: newStatus === "published" });
 }
