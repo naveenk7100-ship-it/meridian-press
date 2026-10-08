@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -20,18 +18,34 @@
 # production
 /build
 
-# misc
+# misc & OS
 .DS_Store
 *.pem
+Thumbs.db
 
-# debug
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# environment files (never commit real secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
+
+# private storage & sensitive data
+storage/private/books/*
+!storage/private/books/.gitkeep
+data/customers.json
+data/entitlements.json
+data/orders.json
+data/payments.json
 
 # vercel
 .vercel
