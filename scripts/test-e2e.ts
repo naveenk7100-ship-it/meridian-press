@@ -2,11 +2,11 @@ import { getAllBooks, getBookBySlug, getBookById, createBookRecord, updateBookRe
 import { findOrCreateCustomer } from "../src/lib/repositories/customers-repo";
 import { createOrderRecord, getOrderById, markOrderPaid, getRealRevenueMetrics, getOrdersByCustomerEmail } from "../src/lib/repositories/orders-repo";
 import { createDownloadEntitlementRecord, getEntitlementByToken, recordDownloadActivity } from "../src/lib/repositories/entitlements-repo";
-import { createPaymentRecord } from "../src/lib/repositories/payments-repo";
+import { createPaymentRecord, getPaymentByProviderPaymentId } from "../src/lib/repositories/payments-repo";
 import { addSubscriber, getAllSubscribers } from "../src/lib/repositories/newsletter-repo";
 import { verifyPaymentSignature, verifyWebhookSignature } from "../src/lib/razorpay";
 import { generateMonographPackage } from "../src/lib/storage";
-import { verifyAdminPasscode } from "../src/lib/auth";
+import { verifyAdminPasscode, getAdminSecret } from "../src/lib/auth";
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -23,7 +23,7 @@ function assert(condition: boolean, testName: string) {
 
 async function runEndToEndTests() {
   console.log("\n========================================================");
-  console.log("  MERIDIAN PRESS — END-TO-END VERIFICATION TEST SUITE   ");
+  console.log("  MERIDIAN PRESS — PRODUCTION HARDENING TEST SUITE      ");
   console.log("========================================================\n");
 
   // TEST SUITE 1: Catalog & Book Models
@@ -59,8 +59,8 @@ async function runEndToEndTests() {
   assert(order.status === "pending", `Order initialized in pending state (Order #${order.id})`);
   assert(order.amount === firstBook.price, `Order amount is ₹${order.amount}`);
 
-  // TEST SUITE 3: Razorpay Server Verification
-  console.log("\n[3/10] Testing Razorpay Cryptographic Verification...");
+  // TEST SUITE 3: Razorpay Server Verification & Replay Protection
+  console.log("\n[3/10] Testing Razorpay Cryptographic Verification & Replay Defense...");
   const mockRzpOrderId = `order_test_${Date.now().toString(36)}`;
   const mockPaymentId = `pay_test_${Date.now().toString(36)}`;
   const testSigValid = verifyPaymentSignature({
@@ -96,7 +96,7 @@ async function runEndToEndTests() {
   });
   assert(paidOrder?.status === "paid", `Order status transitioned to PAID`);
 
-  await createPaymentRecord({
+  const createdPayment = await createPaymentRecord({
     orderId: order.id,
     providerPaymentId: mockPaymentId,
     providerOrderId: mockRzpOrderId,
@@ -104,6 +104,11 @@ async function runEndToEndTests() {
     currency: "INR",
     status: "captured",
   });
+  assert(createdPayment.status === "captured", `Payment recorded with status 'captured'`);
+
+  // Verify duplicate payment lookup
+  const dupCheck = await getPaymentByProviderPaymentId(mockPaymentId);
+  assert(dupCheck?.orderId === order.id, `Payment record indexed and retrievable by providerPaymentId`);
 
   const entitlement = await createDownloadEntitlementRecord({
     orderId: order.id,
@@ -132,10 +137,24 @@ async function runEndToEndTests() {
   const refreshedEnt = await getEntitlementByToken(entitlement.accessToken);
   assert(refreshedEnt?.downloadCount === 1, `Download counter incremented to 1/15`);
 
-  // TEST SUITE 6: Security & Rejection Cases
+  // TEST SUITE 6: Security Bounds & Token Validation
   console.log("\n[6/10] Testing Security Bounds & Token Validation...");
   const fakeEnt = await getEntitlementByToken("non_existent_token_12345");
   assert(fakeEnt === null, `Arbitrary download token rejected (401/404)`);
+
+  // Test pending order cannot unlock files
+  const pendingOrder = await createOrderRecord({
+    customerId: customer.id,
+    customerEmail: customer.email,
+    bookId: firstBook.id,
+    bookTitle: firstBook.title,
+    bookSlug: firstBook.slug,
+    amount: firstBook.price,
+    currency: "INR",
+  });
+  assert(pendingOrder.status === "pending", `Pending order verified`);
+  const fetchedPending = await getOrderById(pendingOrder.id);
+  assert(fetchedPending?.status !== "paid", `Pending order remains unpaid until verified`);
 
   // TEST SUITE 7: Patron Order Recovery Flow
   console.log("\n[7/10] Testing Patron Order Recovery...");
@@ -143,20 +162,30 @@ async function runEndToEndTests() {
   assert(recoveredOrders.length >= 1, `Recovered ${recoveredOrders.length} paid order(s) for ${testEmail}`);
   assert(recoveredOrders[0].id === order.id, `Recovered order ID matches original transaction`);
 
-  // TEST SUITE 8: Real Database Revenue & Admin Authentication
-  console.log("\n[8/10] Testing Real Admin Metrics & Passcode Auth...");
+  // TEST SUITE 8: Real Database Revenue & Admin Authentication Hardening
+  console.log("\n[8/10] Testing Real Admin Metrics & Fail-Closed Auth...");
   const metrics = await getRealRevenueMetrics();
   assert(metrics.totalPaidOrders >= 1, `Real paid order counter: ${metrics.totalPaidOrders}`);
   assert(metrics.totalRevenueINR >= firstBook.price, `Real captured revenue: ₹${metrics.totalRevenueINR}`);
 
-  const validAdmin = verifyAdminPasscode("meridian_dev_secret_2025");
-  assert(validAdmin === true, `Admin auth validates against configured secret`);
+  // Test environment ADMIN_SECRET configuration
+  const testAdminPass = "meridian_production_secure_pass_48291";
+  process.env.ADMIN_SECRET = testAdminPass;
 
-  const badAdmin = verifyAdminPasscode("wrong_password_123");
-  assert(badAdmin === false, `Incorrect admin passcode rejected`);
+  assert(getAdminSecret() === testAdminPass, `getAdminSecret reads from environment`);
+  assert(verifyAdminPasscode(testAdminPass) === true, `Admin auth validates against configured environment secret`);
+  assert(verifyAdminPasscode("wrong_password_123") === false, `Incorrect admin passcode rejected`);
+
+  // Test fail-closed behavior when ADMIN_SECRET is empty
+  delete process.env.ADMIN_SECRET;
+  assert(getAdminSecret() === null, `getAdminSecret fails closed when ADMIN_SECRET is unset`);
+  assert(verifyAdminPasscode("any_password") === false, `verifyAdminPasscode rejects when ADMIN_SECRET is unset`);
+
+  // Restore test admin secret for remaining test execution
+  process.env.ADMIN_SECRET = testAdminPass;
 
   // TEST SUITE 9: Newsletter & Subscriber Repository
-  console.log("\n[9/10] Testing Newsletter Persistence...");
+  console.log("\n[9/10] Testing Newsletter Persistence & Deduplication...");
   const subEmail = `dispatch.reader.${Date.now()}@example.com`;
   const subResult = await addSubscriber(subEmail, "monthly", ["Architecture & Systems"]);
   assert(subResult.isNew === true, `Subscribed new patron: ${subResult.subscriber.email}`);
@@ -171,8 +200,8 @@ async function runEndToEndTests() {
   // TEST SUITE 10: Products / Books CRUD Lifecycle
   console.log("\n[10/10] Testing Products / Books CRUD Lifecycle...");
   const createdBook = await createBookRecord({
-    title: `Monograph CRUD Test ${Date.now()}`,
-    slug: `monograph-crud-test-${Date.now()}`,
+    title: `Monograph Hardening Test ${Date.now()}`,
+    slug: `monograph-hardening-test-${Date.now()}`,
     subtitle: "A test monograph for verifying CRUD lifecycle",
     description: "Short description for verification",
     synopsis: "Detailed synopsis for testing",

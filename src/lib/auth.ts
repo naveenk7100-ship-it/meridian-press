@@ -5,15 +5,13 @@ const ADMIN_COOKIE_NAME = "meridian_admin_session";
 
 export function getAdminSecret(): string | null {
   const secret = process.env.ADMIN_SECRET;
-  if (!secret) {
+  if (!secret || secret.trim().length === 0) {
     if (process.env.NODE_ENV === "production") {
-      console.error("[CRITICAL SECURITY]: ADMIN_SECRET is not set in production environment variables.");
-      return null;
+      console.error("[CRITICAL SECURITY]: ADMIN_SECRET is not configured in environment. Refusing administrative access.");
     }
-    // Local development fallback
-    return "meridian_dev_secret_2025";
+    return null;
   }
-  return secret;
+  return secret.trim();
 }
 
 export function generateAdminSessionHash(): string | null {
@@ -31,10 +29,15 @@ export async function verifyAdminSession(): Promise<boolean> {
     const sessionCookie = cookieStore.get(ADMIN_COOKIE_NAME);
     if (!sessionCookie || !sessionCookie.value) return false;
 
-    return crypto.timingSafeEqual(
-      Buffer.from(sessionCookie.value, "utf-8"),
-      Buffer.from(expectedHash, "utf-8")
-    );
+    const cookieBuf = Buffer.from(sessionCookie.value, "utf-8");
+    const expectedBuf = Buffer.from(expectedHash, "utf-8");
+
+    if (cookieBuf.length !== expectedBuf.length) {
+      crypto.timingSafeEqual(cookieBuf, cookieBuf);
+      return false;
+    }
+
+    return crypto.timingSafeEqual(cookieBuf, expectedBuf);
   } catch {
     return false;
   }
@@ -45,10 +48,15 @@ export function verifyAdminPasscode(inputPasscode: string): boolean {
   if (!secret || !inputPasscode) return false;
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(inputPasscode.trim(), "utf-8"),
-      Buffer.from(secret.trim(), "utf-8")
-    );
+    const inputBuf = Buffer.from(inputPasscode.trim(), "utf-8");
+    const secretBuf = Buffer.from(secret, "utf-8");
+
+    if (inputBuf.length !== secretBuf.length) {
+      crypto.timingSafeEqual(inputBuf, inputBuf);
+      return false;
+    }
+
+    return crypto.timingSafeEqual(inputBuf, secretBuf);
   } catch {
     return false;
   }

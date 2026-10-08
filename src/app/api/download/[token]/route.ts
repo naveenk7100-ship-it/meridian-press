@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEntitlementByToken, recordDownloadActivity } from "@/lib/repositories/entitlements-repo";
+import { getOrderById } from "@/lib/repositories/orders-repo";
 import { getBookById } from "@/lib/repositories/books-repo";
 import { generateMonographPackage } from "@/lib/storage";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -16,6 +17,10 @@ export async function GET(
     }
 
     const { token } = await params;
+    if (!token || token.trim().length < 10) {
+      return new NextResponse("Access Denied. Invalid download token format.", { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const formatParam = (searchParams.get("format") || "epub").toLowerCase();
 
@@ -27,24 +32,30 @@ export async function GET(
     // 1. Verify Entitlement in Database
     const entitlement = await getEntitlementByToken(token);
     if (!entitlement) {
-      return new NextResponse("Access Denied. Invalid or expired download token.", { status: 401 });
+      return new NextResponse("Access Denied. Invalid or unrecognized download token.", { status: 401 });
     }
 
     if (entitlement.isRevoked) {
-      return new NextResponse("This download entitlement has been revoked by the publisher.", { status: 403 });
+      return new NextResponse("Access Denied. This download entitlement has been revoked by the publisher.", { status: 403 });
     }
 
-    // 2. Check Expiration
+    // 2. Verify Associated Order Status (Failed/Pending payments NEVER unlock files)
+    const order = await getOrderById(entitlement.orderId);
+    if (!order || order.status !== "paid") {
+      return new NextResponse("Access Denied. Order payment has not been verified or has failed.", { status: 403 });
+    }
+
+    // 3. Check Expiration
     const now = new Date();
     const expiry = new Date(entitlement.expiresAt);
     if (now > expiry) {
       return new NextResponse(
-        "This download link has expired. Please use the order recovery page to generate a refreshed access link.",
+        "This download link has expired. Please use the order recovery desk to obtain a refreshed access link.",
         { status: 410 }
       );
     }
 
-    // 3. Check Download Limit
+    // 4. Check Download Quota
     if (entitlement.downloadCount >= entitlement.maxDownloads) {
       return new NextResponse(
         `Maximum download limit (${entitlement.maxDownloads}) reached for this token. Please contact support.`,
@@ -52,16 +63,16 @@ export async function GET(
       );
     }
 
-    // 4. Retrieve Book
+    // 5. Retrieve Book
     const book = await getBookById(entitlement.bookId);
     if (!book) {
-      return new NextResponse("Requested monograph not found.", { status: 404 });
+      return new NextResponse("Requested monograph not found in catalog.", { status: 404 });
     }
 
-    // 5. Record Download Activity
+    // 6. Record Download Activity & Quota Increment
     await recordDownloadActivity(entitlement.id);
 
-    // 6. Generate Digital Package
+    // 7. Generate or Serve Master Monograph Package
     const fileBuffer = generateMonographPackage(book, format, entitlement.customerEmail);
 
     const mimeTypes = {
@@ -87,6 +98,6 @@ export async function GET(
     });
   } catch (error: unknown) {
     console.error("[Download API Error]:", error);
-    return new NextResponse("Failed to process download stream.", { status: 500 });
+    return new NextResponse("Failed to process digital download stream.", { status: 500 });
   }
 }

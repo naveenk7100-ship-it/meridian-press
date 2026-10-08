@@ -135,3 +135,21 @@ export async function getPaymentByOrderId(orderId: string): Promise<Payment | nu
   ensureLocalFile();
   return memoryPayments.find((p) => p.orderId === orderId) || null;
 }
+
+export async function getPaymentByProviderPaymentId(providerPaymentId: string): Promise<Payment | null> {
+  if (isPostgresConfigured()) {
+    try {
+      const row = await queryOne(
+        "SELECT * FROM payments WHERE provider_payment_id = $1 LIMIT 1",
+        [providerPaymentId]
+      );
+      if (row) return mapRowToPayment(row);
+    } catch (err) {
+      console.error("[Payments Repo] Postgres error:", err);
+    }
+  }
+
+  ensureLocalFile();
+  return memoryPayments.find((p) => p.providerPaymentId === providerPaymentId) || null;
+}
+

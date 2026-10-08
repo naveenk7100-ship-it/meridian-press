@@ -52,7 +52,11 @@ export async function createRazorpayOrder(params: CreateOrderParams): Promise<{
     };
   }
 
-  // Development fallback when Razorpay credentials have not been configured yet
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Razorpay credentials are not configured in production environment.");
+  }
+
+  // Development sandbox fallback when Razorpay credentials have not been configured yet
   const mockOrderId = `order_test_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
   return {
     id: mockOrderId,
@@ -70,23 +74,32 @@ export function verifyPaymentSignature(params: {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
   if (!keySecret) {
-    // When credentials are not yet configured in test/preview environment, verify test mock signatures
+    if (process.env.NODE_ENV === "production") {
+      console.error("[CRITICAL SECURITY]: RAZORPAY_KEY_SECRET is not configured in production. Rejecting verification.");
+      return false;
+    }
+    // Sandbox test signatures in dev/test only
     return (
       params.razorpay_order_id.startsWith("order_test_") ||
       params.razorpay_signature.startsWith("sig_test_")
     );
   }
 
-  const generatedSignature = crypto
-    .createHmac("sha256", keySecret)
-    .update(`${params.razorpay_order_id}|${params.razorpay_payment_id}`)
-    .digest("hex");
-
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(generatedSignature, "utf-8"),
-      Buffer.from(params.razorpay_signature, "utf-8")
-    );
+    const generatedSignature = crypto
+      .createHmac("sha256", keySecret)
+      .update(`${params.razorpay_order_id}|${params.razorpay_payment_id}`)
+      .digest("hex");
+
+    const genBuf = Buffer.from(generatedSignature, "utf-8");
+    const sigBuf = Buffer.from(params.razorpay_signature, "utf-8");
+
+    if (genBuf.length !== sigBuf.length) {
+      crypto.timingSafeEqual(genBuf, genBuf);
+      return false;
+    }
+
+    return crypto.timingSafeEqual(genBuf, sigBuf);
   } catch {
     return false;
   }
@@ -102,16 +115,21 @@ export function verifyWebhookSignature(params: {
     return false;
   }
 
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update(params.rawBody)
-    .digest("hex");
-
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, "utf-8"),
-      Buffer.from(params.signature, "utf-8")
-    );
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(params.rawBody)
+      .digest("hex");
+
+    const expectedBuf = Buffer.from(expectedSignature, "utf-8");
+    const sigBuf = Buffer.from(params.signature, "utf-8");
+
+    if (expectedBuf.length !== sigBuf.length) {
+      crypto.timingSafeEqual(expectedBuf, expectedBuf);
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expectedBuf, sigBuf);
   } catch {
     return false;
   }

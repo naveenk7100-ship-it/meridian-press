@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { getOrderByRazorpayOrderId, markOrderPaid } from "@/lib/repositories/orders-repo";
 import { getBookById } from "@/lib/repositories/books-repo";
-import { createPaymentRecord } from "@/lib/repositories/payments-repo";
+import { createPaymentRecord, getPaymentByProviderPaymentId } from "@/lib/repositories/payments-repo";
 import { createDownloadEntitlementRecord, getEntitlementByOrderId } from "@/lib/repositories/entitlements-repo";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 
@@ -35,44 +35,55 @@ export async function POST(request: NextRequest) {
 
       if (rzOrderId) {
         const order = await getOrderByRazorpayOrderId(rzOrderId);
-        if (order && order.status !== "paid") {
-          const updatedOrder = await markOrderPaid(order.id, {
-            razorpayPaymentId: rzPaymentId || "webhook_captured",
-            razorpaySignature: signature,
-          });
+        if (order) {
+          // Replay check
+          if (rzPaymentId) {
+            const existingPayment = await getPaymentByProviderPaymentId(rzPaymentId);
+            if (existingPayment && existingPayment.orderId !== order.id) {
+              console.warn(`[Webhook Security Warning]: Payment ID ${rzPaymentId} already assigned to another order ${existingPayment.orderId}`);
+              return NextResponse.json({ error: "Payment replay detected" }, { status: 400 });
+            }
+          }
 
-          await createPaymentRecord({
-            orderId: order.id,
-            providerPaymentId: rzPaymentId || "webhook_captured",
-            providerOrderId: rzOrderId,
-            amount: paymentEntity?.amount ? paymentEntity.amount / 100 : order.amount,
-            currency: paymentEntity?.currency || order.currency,
-            status: "captured",
-            method: paymentEntity?.method,
-            rawResponse: paymentEntity,
-          });
-
-          let entitlement = await getEntitlementByOrderId(order.id);
-          if (!entitlement) {
-            entitlement = await createDownloadEntitlementRecord({
-              orderId: order.id,
-              bookId: order.bookId,
-              customerEmail: order.customerEmail,
-              expiresInDays: 14,
-              maxDownloads: 15,
+          if (order.status !== "paid") {
+            const updatedOrder = await markOrderPaid(order.id, {
+              razorpayPaymentId: rzPaymentId || "webhook_captured",
+              razorpaySignature: signature,
             });
 
-            const book = await getBookById(order.bookId);
-            if (book) {
-              const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-              const downloadPageUrl = `${appUrl}/orders/${order.id}?token=${entitlement.accessToken}`;
-              await sendOrderConfirmationEmail({
-                order: updatedOrder || order,
-                book,
-                downloadUrl: downloadPageUrl,
+            await createPaymentRecord({
+              orderId: order.id,
+              providerPaymentId: rzPaymentId || "webhook_captured",
+              providerOrderId: rzOrderId,
+              amount: paymentEntity?.amount ? paymentEntity.amount / 100 : order.amount,
+              currency: paymentEntity?.currency || order.currency,
+              status: "captured",
+              method: paymentEntity?.method,
+              rawResponse: paymentEntity,
+            });
+
+            let entitlement = await getEntitlementByOrderId(order.id);
+            if (!entitlement) {
+              entitlement = await createDownloadEntitlementRecord({
+                orderId: order.id,
+                bookId: order.bookId,
                 customerEmail: order.customerEmail,
-                customerName: order.customerName,
+                expiresInDays: 14,
+                maxDownloads: 15,
               });
+
+              const book = await getBookById(order.bookId);
+              if (book) {
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://meridianpress.pub";
+                const downloadPageUrl = `${appUrl}/orders/${order.id}?token=${entitlement.accessToken}`;
+                await sendOrderConfirmationEmail({
+                  order: updatedOrder || order,
+                  book,
+                  downloadUrl: downloadPageUrl,
+                  customerEmail: order.customerEmail,
+                  customerName: order.customerName,
+                });
+              }
             }
           }
         }

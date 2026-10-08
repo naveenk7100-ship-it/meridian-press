@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrderByRazorpayOrderId, markOrderPaid, getOrderById } from "@/lib/repositories/orders-repo";
 import { getBookById } from "@/lib/repositories/books-repo";
-import { createPaymentRecord } from "@/lib/repositories/payments-repo";
+import { createPaymentRecord, getPaymentByProviderPaymentId } from "@/lib/repositories/payments-repo";
 import { createDownloadEntitlementRecord, getEntitlementByOrderId } from "@/lib/repositories/entitlements-repo";
 import { verifyPaymentSignature } from "@/lib/razorpay";
 import { sendOrderConfirmationEmail } from "@/lib/email";
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, order_id } = parsed.data;
 
-    // 1. Strict Server-Side Signature Verification
+    // 1. Strict Cryptographic Signature Verification
     const isValidSignature = verifyPaymentSignature({
       razorpay_order_id,
       razorpay_payment_id,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!isValidSignature) {
-      console.error(`[Payment Verification Failed]: Invalid signature for order ${razorpay_order_id}`);
+      console.warn(`[Payment Verification Failed]: Invalid signature for order ${razorpay_order_id}`);
       return NextResponse.json(
         { success: false, error: "Payment verification failed. Invalid cryptographic signature." },
         { status: 400 }
@@ -66,7 +66,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Check if already marked paid (idempotency)
+    // 3. Replay attack check: Ensure this payment ID is not bound to a DIFFERENT order
+    const existingPayment = await getPaymentByProviderPaymentId(razorpay_payment_id);
+    if (existingPayment && existingPayment.orderId !== order.id) {
+      console.warn(`[Security Alert]: Replay attack attempt detected. Payment ${razorpay_payment_id} belongs to order ${existingPayment.orderId}, not ${order.id}`);
+      return NextResponse.json(
+        { success: false, error: "Payment has already been applied to another transaction." },
+        { status: 400 }
+      );
+    }
+
+    // 4. Check if already marked paid (idempotency)
     if (order.status !== "paid") {
       // Transition order status to PAID
       const updatedOrder = await markOrderPaid(order.id, {
@@ -76,17 +86,19 @@ export async function POST(request: NextRequest) {
       if (updatedOrder) order = updatedOrder;
 
       // Log payment record
-      await createPaymentRecord({
-        orderId: order.id,
-        providerPaymentId: razorpay_payment_id,
-        providerOrderId: razorpay_order_id,
-        amount: order.amount,
-        currency: order.currency,
-        status: "captured",
-      });
+      if (!existingPayment) {
+        await createPaymentRecord({
+          orderId: order.id,
+          providerPaymentId: razorpay_payment_id,
+          providerOrderId: razorpay_order_id,
+          amount: order.amount,
+          currency: order.currency,
+          status: "captured",
+        });
+      }
     }
 
-    // 4. Ensure download entitlement exists
+    // 5. Ensure download entitlement exists
     let entitlement = await getEntitlementByOrderId(order.id);
     if (!entitlement) {
       entitlement = await createDownloadEntitlementRecord({
@@ -97,10 +109,10 @@ export async function POST(request: NextRequest) {
         maxDownloads: 15,
       });
 
-      // 5. Send order confirmation email
+      // Send order confirmation email
       const book = await getBookById(order.bookId);
       if (book) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://meridianpress.pub";
         const downloadPageUrl = `${appUrl}/orders/${order.id}?token=${entitlement.accessToken}`;
         await sendOrderConfirmationEmail({
           order,
