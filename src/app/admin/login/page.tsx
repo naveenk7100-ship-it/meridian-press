@@ -84,7 +84,7 @@ export default function AdminLoginPage() {
               />
             </div>
             <p className="mt-2 text-[11px] font-mono text-[#737680]">
-              Default access key: <code className="bg-[#F4EFE6] px-1 py-0.5 rounded text-[#B85D19]">meridian2025</code> (Configurable via <code>ADMIN_SECRET</code>)
+              Publisher authentication requires the secret key configured in the environment.
             </p>
           </div>
 

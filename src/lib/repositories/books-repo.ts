@@ -94,9 +94,7 @@ export async function getAllBooks(): Promise<Book[]> {
   if (isPostgresConfigured()) {
     try {
       const rows = await query("SELECT * FROM books ORDER BY created_at DESC");
-      if (rows.length > 0) {
-        return rows.map(mapRowToBook);
-      }
+      return rows.map(mapRowToBook);
     } catch (err) {
       console.error("[Books Repo] Postgres query failed, falling back to local store:", err);
     }
@@ -112,9 +110,7 @@ export async function getPublishedBooks(): Promise<Book[]> {
   if (isPostgresConfigured()) {
     try {
       const rows = await query("SELECT * FROM books WHERE (status = 'published' OR (status IS NULL AND published = true)) ORDER BY published_date DESC");
-      if (rows.length > 0) {
-        return rows.map(mapRowToBook);
-      }
+      return rows.map(mapRowToBook);
     } catch (err) {
       console.error("[Books Repo] Postgres query failed, falling back to local store:", err);
     }
@@ -135,7 +131,7 @@ export async function getBookBySlug(slug: string): Promise<Book | null> {
   if (isPostgresConfigured()) {
     try {
       const row = await queryOne("SELECT * FROM books WHERE slug = $1 LIMIT 1", [slug]);
-      if (row) return mapRowToBook(row);
+      return row ? mapRowToBook(row) : null;
     } catch (err) {
       console.error("[Books Repo] Postgres query failed:", err);
     }
@@ -149,7 +145,7 @@ export async function getBookById(id: string): Promise<Book | null> {
   if (isPostgresConfigured()) {
     try {
       const row = await queryOne("SELECT * FROM books WHERE id = $1 LIMIT 1", [id]);
-      if (row) return mapRowToBook(row);
+      return row ? mapRowToBook(row) : null;
     } catch (err) {
       console.error("[Books Repo] Postgres query failed:", err);
     }

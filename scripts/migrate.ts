@@ -36,8 +36,10 @@ async function runMigration() {
     const checkBooks = await pool.query("SELECT COUNT(*) FROM books");
     const bookCount = parseInt(checkBooks.rows[0].count, 10);
 
-    if (bookCount === 0) {
-      console.log(`[Migration] Seeding initial catalog (${INITIAL_BOOKS.length} monographs)...`);
+    const shouldSeed = process.argv.includes("--seed") || process.env.SEED_INITIAL_DATA === "true";
+
+    if (bookCount === 0 && shouldSeed) {
+      console.log(`[Migration] Explicit seed requested. Seeding sample catalog (${INITIAL_BOOKS.length} monographs)...`);
       for (const b of INITIAL_BOOKS) {
         await pool.query(
           `INSERT INTO books (
@@ -94,6 +96,8 @@ async function runMigration() {
         );
       }
       console.log("[Migration] Initial catalog seeded successfully.");
+    } else if (bookCount === 0) {
+      console.log("[Migration] Database schema applied. Zero demo records inserted. Ready for production book uploads via /admin.");
     } else {
       console.log(`[Migration] Catalog already contains ${bookCount} monographs. Skipped seeding.`);
     }
