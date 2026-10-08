@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "npx tsx scripts/migrate.ts",
-    "test:e2e": "npx tsx scripts/test-e2e.ts"
+    "test:e2e": "npx tsx scripts/test-e2e.ts",
+    "test:smoke": "npx tsx scripts/smoke-test.ts"
   },
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",
